@@ -1,5 +1,7 @@
 # GitHub Issue Flow
 
+[日本語](README_ja.md)
+
 A small, stack-agnostic Agent Skill for **issue-first AI coding**: parent GitHub Issues → real sub-issues → parallel worktrees → non-interactive cross-model reviews → CI-gated squash merges.
 
 Compatible with **Cursor, Codex, and Claude Code** through the open [Agent Skills CLI](https://github.com/vercel-labs/skills).

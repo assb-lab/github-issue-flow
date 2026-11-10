@@ -54,13 +54,14 @@ main
         └── stack/persistence PR C, base: stack/domain; closes #33, #34, ...
 ```
 
-## 3. Implement in isolated worktrees and publish stacked PRs
+## 3. Implement in isolated worktrees, integrate child work, and open stacked PRs
 
-1. Assign independent children to available subagents, each with its **own writable worktree/branch**; no two agents edit the same worktree. Parallelize contract-independent tasks and coordinate shared files. If subagents are unavailable, follow the same plan sequentially.
-2. Establish and publish stable interfaces first. For a dependent PR, start its branch/worktree from the **published head of its immediate predecessor**, even if that predecessor is an open draft PR; do not quietly branch it from `main`. Example: `git worktree add -b stack/domain ../wt-domain origin/stack/foundation` after fetching the remote predecessor.
-3. Commit and push the assigned Issue changes. Create a draft PR with `gh pr create --draft --base <immediate-parent-branch-or-default> --head <feature-branch>`. Open the PR **before upstream merges**; waiting for upstream merge defeats stacking.
-4. In every PR body provide: stack position (`2/4`), **direct base branch** and predecessor PR link, child IDs completed (`Closes #N` for fully delivered children; `Refs #N` for partial work), scope, checks, and review status. The **PR diff must contain only that PR's slice relative to its own base**, not everything accumulated since `main`.
-5. Update the published mapping as branches/PRs are created. Keep child Issues open until their requirements actually land on the default branch; a stacked PR targeting another feature branch does not necessarily auto-close them.
+1. Create **one PR-group integration branch and worktree** per planned PR, owned by a single integrator. Branch from the **published tip of the immediate predecessor PR** (or from the default branch for the bottom PR), even when that predecessor is still open. Example, after fetching the published parent: `git worktree add -b stack/domain ../wt-domain origin/stack/foundation`. Do not quietly use `main` as the base for every PR.
+2. For parallel sub-issues **within that PR group**, assign each available subagent a separate `work/issue-<N>` branch and writable worktree, based on the agreed PR-group starting commit. Establish shared contracts and file ownership first; avoid overlapping edits. Each agent commits its own child outcome and runs relevant focused checks. If agents are unavailable, implement sequentially in the group worktree.
+3. The integrator **cherry-picks completed child commits (or explicitly integrates their branches)** into the group's integration branch in dependency order, resolves conflicts there, and runs combined checks. Do not let parallel agents write to the same integration worktree, silently overwrite each other's changes, or auto-merge child branches directly to `main`. This is how **many small sub-issues become one coherent PR** while retaining individual Issue tracking.
+4. Push the integration branch and create a draft PR with `gh pr create --draft --base <immediate-parent-branch-or-default> --head <integration-branch>`. Open stacked PRs **before** upstream PRs merge; waiting for upstream merge defeats stacking. Keep the incremental PR diff limited to the group relative to its actual base.
+5. In every PR body provide: stack position (`2/4`), **direct base branch** and predecessor PR link, child IDs completed (`Closes #N` for fully delivered children; `Refs #N` for partial work), scope, checks, and review status. Do not close an Issue for an unimplemented acceptance criterion. One small child may warrant its own PR, but this is an exception, not the default.
+6. Update the published Issue → PR group → stack mapping as work lands. Keep child Issues open until requirements actually land on the default branch; a stacked PR targeting a feature branch does not necessarily auto-close them.
 
 ## 4. Mandatory non-interactive independent review of EACH incremental PR
 

@@ -76,12 +76,14 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph ROOM["座席エディタのレビュー"]
-        A["feat/room-foundation"] -->|"依存PR"| B["feat/seat-layout"]
-        B -->|"順にSquash"| SR["stack/room-editor"]
+        A["feat/room-foundation"] -->|"PRベースの依存"| B["feat/seat-layout"]
+        A -->|"先にSquash"| SR["stack/room-editor"]
+        B -->|"続いてSquash"| SR
     end
     subgraph SOLVER["ソルバーのレビュー"]
-        C["feat/rule-evaluator"] -->|"依存PR"| D["feat/optimization"]
-        D -->|"順にSquash"| SS["stack/solver"]
+        C["feat/rule-evaluator"] -->|"PRベースの依存"| D["feat/optimization"]
+        C -->|"先にSquash"| SS["stack/solver"]
+        D -->|"続いてSquash"| SS
     end
     SR -->|"人間承認後、通常マージ"| DEV["dev"]
     SS -->|"人間承認後、通常マージ"| DEV

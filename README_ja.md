@@ -12,6 +12,13 @@
 
 参考事例は[sekigae-app](https://github.com/ks250206/sekigae-app)です。**13 Epic・146個の実Sub-issue・11本のstacked PR** に分け、[PR #161](https://github.com/ks250206/sekigae-app/pull/161) → [PR #162](https://github.com/ks250206/sekigae-app/pull/162) → [PR #163](https://github.com/ks250206/sekigae-app/pull/163) のように積んでいます。これは**目安となる構造であり、小さな案件でも同じ数を強制するものではありません**。
 
+## Epic Issueは詳細な設計書として作成
+
+親Epicは単なるTODOの一覧ではなく、**詳細な仕様・設計Issue**にします。背景と課題、目的、スコープ（含む／含まない）、機能要件・利用シナリオ・例外ケース、アーキテクチャとデータ／API等の契約、依存関係、テスト方針、検証可能な完了条件、紐付くネイティブSub-issueを記載します。
+
+**すべてのEpic IssueにMermaidの`flowchart`を最低1つ必須**とし、実際のユーザー操作、処理分岐、データの流れ、システム構成・処理ライフサイクルなどを図示します。単なる「計画→実装→テスト」図だけでは不可。依存関係が複雑なEpicでは、実際のSub-issue番号を使った依存DAGも追加します。GitHub上での表示とリンクの整合性を確認します。
+
+具体的な記述例とMermaid図を含む[親Epic Issueテンプレート](skills/github-issue-flow/references/epic-issue-template.md)を追加しました。Epic作成後にSub-issueを発行し、親Issueへリンク・依存関係を追記する運用です。
 ## テーマ別レビュースタックと承認フロー
 
 単一の`stack`ブランチを使う代わりに、**Epicまたは関連する開発テーマごとに`stack/<topic>`を作成**します。テーマごとに独立したPRとプレビューを用意できるので、複数の開発を並行してレビューできます。

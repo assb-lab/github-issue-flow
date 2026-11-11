@@ -6,10 +6,59 @@ A stack-agnostic Agent Skill for **issue-first AI coding**: Epics → **fine-gra
 
 Compatible with **Cursor, Codex, and Claude Code** through the open [Agent Skills CLI](https://github.com/vercel-labs/skills).
 
+## Workflow at a glance
+
+The workflow separates **Epic design**, **small native sub-issues**, **grouped feature PRs**, **human review stacks**, and **release promotion**. Each arrow shows the change's intended direction; the two human gates are mandatory.
+
+```mermaid
+flowchart LR
+    SPEC["Specification"] --> EPIC["Epic Issue<br/>Detailed spec + Mermaid"]
+    EPIC --> ISSUES["Native sub-issues<br/>Small and testable"]
+    ISSUES --> FEAT["Stacked feat/* PRs<br/>Independent AI review"]
+    FEAT -->|"Squash merge"| STACK["stack/topic<br/>Topic staging branch"]
+    STACK --> HUB["Review hub PR<br/>stack/topic → dev"]
+    HUB --> GATE{"Human approved?"}
+    GATE -->|"Changes requested"| FEAT
+    GATE -->|"Yes: merge commit"| DEV["dev<br/>Accepted integration"]
+    DEV --> RELEASE["Release PR<br/>dev → main"]
+    RELEASE --> RELEASE_GATE{"Human approved?"}
+    RELEASE_GATE -->|"Changes requested"| DEV
+    RELEASE_GATE -->|"Yes: squash merge"| MAIN["main<br/>Stable release"]
+```
+
+After a release squash, merge the new `main` commit back into `dev` to reconcile history. GitHub Actions are [opt-in](#github-actions-cost-decision), especially for private repositories.
 ## What makes this workflow different
 
 **Issue granularity is not PR granularity.** The agent tracks each small, verifiable deliverable as a native GitHub sub-issue, but groups related sub-issues into cohesive PRs. Dependent PRs target their immediate predecessor's still-open branch, instead of waiting for every predecessor to merge. Each incremental diff is reviewed against its own PR base; squash-merged feature stacks are carefully restacked against their assigned `stack/<topic>` branch, not `main`.
 
+### Example: small issues, grouped PRs
+
+An Epic contains **many independently verifiable sub-issues**; one feature PR may deliver several of them. The dashed PR-to-PR arrows indicate **base-branch dependencies**, while each completed PR is individually squash-merged into its topic stack (in dependency order).
+
+```mermaid
+flowchart TD
+    EPIC["Epic: Seat Editor<br/>Detailed requirements + flowchart"]
+    I1["Sub-issue A<br/>Schema contract"]
+    I2["Sub-issue B<br/>State management"]
+    I3["Sub-issue C<br/>Editor UI"]
+    I4["Sub-issue D<br/>Input validation"]
+    I5["Sub-issue E<br/>Integration tests"]
+    PA["PR A<br/>feat/seat-foundation"]
+    PB["PR B<br/>feat/seat-ui"]
+    PC["PR C<br/>feat/seat-tests"]
+    ST["stack/seat-editor<br/>Human review staging"]
+    EPIC --> I1 & I2 & I3 & I4 & I5
+    I1 --> PA
+    I2 --> PA
+    I3 --> PB
+    I4 --> PB
+    I5 --> PC
+    PA -.->|"PR base dependency"| PB
+    PB -.->|"PR base dependency"| PC
+    PA -->|"Squash first"| ST
+    PB -->|"Squash next"| ST
+    PC -->|"Squash last"| ST
+```
 [sekigae-app](https://github.com/ks250206/sekigae-app) is the reference pattern: **13 Epics, 146 native sub-issues and 11 stacked implementation PRs**, starting with [PR #161](https://github.com/ks250206/sekigae-app/pull/161) → [PR #162](https://github.com/ks250206/sekigae-app/pull/162) → [PR #163](https://github.com/ks250206/sekigae-app/pull/163). Those counts are an example, **not fixed quotas** for smaller projects.
 
 ## Epic Issues as detailed specifications
@@ -19,19 +68,26 @@ Every Epic/parent Issue must be a **substantial design specification**, not just
 **At least one feature-specific Mermaid `flowchart` is required in every Epic Issue.** It should show the real user journey, data/control flow or system lifecycle, including meaningful decision and failure paths. Complex Epics should also have a second Mermaid dependency diagram with actual child Issue numbers. Agents must validate the diagrams and update the parent Issue after creating its real sub-issues.
 
 See the [copyable Epic Issue template](skills/github-issue-flow/references/epic-issue-template.md), including a worked Mermaid example and an authoring checklist.
+
 ## Topic-specific review stacks and human promotion
 
 Instead of one global `stack` branch, use **one short-lived review stack per independent Epic or related work batch**. This supports multiple concurrent human reviews without a shared review queue.
 
-```text
-main (released)
-└── dev (human-approved integration)
-    ├── stack/room-editor    → dev (review hub PR A)
-    │   └── feat/room-foundation  → stack/room-editor
-    │       └── feat/seat-layout  → feat/room-foundation
-    └── stack/solver         → dev (review hub PR B)
-        └── feat/rule-evaluator   → stack/solver
-            └── feat/optimization → feat/rule-evaluator
+```mermaid
+flowchart LR
+    subgraph ROOM["Seat editor review stack"]
+        A["feat/room-foundation"] -->|"PR base dependency"| B["feat/seat-layout"]
+        A -->|"Squash first"| SR["stack/room-editor"]
+        B -->|"Squash next"| SR
+    end
+    subgraph SOLVER["Solver review stack"]
+        C["feat/rule-evaluator"] -->|"PR base dependency"| D["feat/optimization"]
+        C -->|"Squash first"| SS["stack/solver"]
+        D -->|"Squash next"| SS
+    end
+    SR -->|"Human-approved merge commit"| DEV["dev"]
+    SS -->|"Human-approved merge commit"| DEV
+    DEV -->|"Approved release: squash"| MAIN["main"]
 ```
 
 1. The agent creates `dev` from the stable release branch when missing. Each **new** `stack/<topic>` branch starts from the current `dev` tip. Related native sub-issues are implemented in independent worktrees and grouped into feature PRs.

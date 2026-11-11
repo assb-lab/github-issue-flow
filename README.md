@@ -2,15 +2,40 @@
 
 [日本語](README_ja.md)
 
-A small, stack-agnostic Agent Skill for **issue-first AI coding**: Epics → **fine-grained, real GitHub sub-issues** → dependency/PR-stack plan → isolated parallel worktrees → **stacked PRs** → non-interactive cross-model reviews → CI-gated, bottom-up squash merges and restacking.
+A stack-agnostic Agent Skill for **issue-first AI coding**: Epics → **fine-grained, real GitHub sub-issues** → parallel worktrees → **stacked feature PRs** → AI review and a human-facing **`stack` review lane** → approved **`dev` integration** → reviewed **`main` release**. GitHub Actions are opt-in.
 
 Compatible with **Cursor, Codex, and Claude Code** through the open [Agent Skills CLI](https://github.com/vercel-labs/skills).
 
 ## What makes this workflow different
 
-**Issue granularity is not PR granularity.** The agent tracks each small, verifiable deliverable as a native GitHub sub-issue, but groups related sub-issues into cohesive PRs. Dependent PRs target their immediate predecessor's still-open branch, instead of waiting for every predecessor to merge. Each incremental diff is reviewed against its own PR base; squash-merged stacks are then carefully rebased and retargeted.
+**Issue granularity is not PR granularity.** The agent tracks each small, verifiable deliverable as a native GitHub sub-issue, but groups related sub-issues into cohesive PRs. Dependent PRs target their immediate predecessor's still-open branch, instead of waiting for every predecessor to merge. Each incremental diff is reviewed against its own PR base; squash-merged feature stacks are carefully restacked against `stack`, not `main`.
 
 [sekigae-app](https://github.com/ks250206/sekigae-app) is the reference pattern: **13 Epics, 146 native sub-issues and 11 stacked implementation PRs**, starting with [PR #161](https://github.com/ks250206/sekigae-app/pull/161) → [PR #162](https://github.com/ks250206/sekigae-app/pull/162) → [PR #163](https://github.com/ks250206/sekigae-app/pull/163). Those counts are an example, **not fixed quotas** for smaller projects.
+
+## Branch lanes and human review
+
+```text
+main              released/stable (release approval required)
+└── dev           integrated and human-approved
+    └── stack     review staging branch; human review hub = PR stack → dev
+        └── feat/foundation  PR A, base: stack
+            └── feat/domain PR B, base: feat/foundation
+```
+
+1. The agent creates `dev` and `stack` from the existing stable branch when missing, without resetting branches that already exist.
+2. Related sub-issues are implemented in independent worktrees and grouped into feature PRs. Dependent PRs stack on each other's feature branches. After independent AI review and checks, feature PRs are **squash-merged into `stack`**, restacking any descendants.
+3. A `stack → dev` PR acts as the **review hub**: it lists all feature PRs, related Issues, screenshots/previews, checks and outstanding concerns. **Human approval is mandatory** for promotion to `dev`; no auto-merge.
+4. Release is a separate `dev → main` PR requiring **another human approval**. Promotions between the long-lived branches should preserve ancestry (regular merge commits), so `stack`/`dev` can be fast-forward synchronized safely.
+
+**Branch name warning:** the persistent branch is named `stack`, so feature branches **cannot** be named `stack/anything` (Git ref namespace collision). Use `feat/*` and `work/issue-*` instead.
+
+## GitHub Actions cost decision
+
+Before creating workflows or causing private-repository workflows to run, the skill asks:
+
+> Use GitHub Actions? **No (local checks only)** / **Yes, within included usage** / **Yes, with an approved paid budget**.
+
+Public repositories' standard GitHub-hosted runners are generally free. Private repositories get a plan-dependent included allowance and can incur costs after that allowance is used ([GitHub billing docs](https://docs.github.com/en/actions/concepts/billing-and-usage)). The agent checks existing workflows and respects required checks; without explicit consent, it will not add Actions workflows or knowingly trigger private-repo CI. Local verification is reported distinctly from GitHub CI. Enable scoped triggers, cancellation, timeouts, and budget alerts when CI is approved.
 
 ## Install
 

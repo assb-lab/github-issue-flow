@@ -2,34 +2,38 @@
 
 [English](README.md)
 
-**Issueを起点とするAIコーディング**のための、技術スタックに依存しないAgent Skillです。Epic → **細粒度のGitHubネイティブSub-issue** → 独立worktreeでの並列実装 → **stacked PR** → AIレビュー → **`stack` で人間が確認** → **`dev` に統合** → **`main` にリリース**、という流れです。GitHub Actionsは利用許可を事前に確認します。
+**Issueを起点とするAIコーディング**のための、技術スタックに依存しないAgent Skillです。Epic → **細粒度のGitHubネイティブSub-issue** → 独立worktreeでの並列実装 → **stacked PR** → AIレビュー → **テーマ別 `stack/*` で人間が確認** → **`dev` に統合** → **`main` にリリース**、という流れです。GitHub Actionsは利用許可を事前に確認します。
 
 オープンな[Agent Skills CLI](https://github.com/vercel-labs/skills)を通じて、**Cursor、Codex、Claude Code**で利用できます。
 
 ## ワークフローの特徴
 
-**Sub-issueの粒度とPRの粒度は別です。** 各Sub-issueは独立して完了判定できる小さな実装成果に分けつつ、関連する複数のSub-issueを1本の機能別PRにまとめます。依存するPRは、前のPRのマージを待たずにその機能ブランチをbaseとして積みます。各PRの差分はそのPRの直接のbaseと比較してレビューし、squash merge後は後続PRを安全にrebase・retargetします。最初のfeature PRのbaseは`main`ではなく`stack`です。
+**Sub-issueの粒度とPRの粒度は別です。** 各Sub-issueは独立して完了判定できる小さな実装成果に分けつつ、関連する複数のSub-issueを1本の機能別PRにまとめます。依存するPRは、前のPRのマージを待たずにその機能ブランチをbaseとして積みます。各PRの差分はそのPRの直接のbaseと比較してレビューし、squash merge後は後続PRを安全にrebase・retargetします。最初のfeature PRのbaseは`main`ではなく、そのテーマ専用の`stack/<topic>`です。
 
 参考事例は[sekigae-app](https://github.com/ks250206/sekigae-app)です。**13 Epic・146個の実Sub-issue・11本のstacked PR** に分け、[PR #161](https://github.com/ks250206/sekigae-app/pull/161) → [PR #162](https://github.com/ks250206/sekigae-app/pull/162) → [PR #163](https://github.com/ks250206/sekigae-app/pull/163) のように積んでいます。これは**目安となる構造であり、小さな案件でも同じ数を強制するものではありません**。
 
-## ブランチ構成とレビューフロー
+## テーマ別レビュースタックと承認フロー
+
+単一の`stack`ブランチを使う代わりに、**Epicまたは関連する開発テーマごとに`stack/<topic>`を作成**します。テーマごとに独立したPRとプレビューを用意できるので、複数の開発を並行してレビューできます。
 
 ```text
-main              安定版・リリース用（人間の承認が必要）
-└── dev           人間が承認済みの開発成果の統合先
-    └── stack     レビュー用ステージング（レビュー窓口PR: stack → dev）
-        └── feat/foundation  PR A → stack
-            └── feat/domain PR B → feat/foundation
+main（安定版・リリース）
+└── dev（承認済み開発内容の統合先）
+    ├── stack/room-editor    → dev（人間のレビューPR A）
+    │   └── feat/room-foundation → stack/room-editor
+    │       └── feat/seat-layout → feat/room-foundation
+    └── stack/solver         → dev（人間のレビューPR B）
+        └── feat/rule-evaluator  → stack/solver
+            └── feat/optimization → feat/rule-evaluator
 ```
 
-1. 対象リポジトリで`dev`と`stack`がなければ、安定ブランチから安全に作成します。すでにあるブランチの履歴は消しません。
-2. 小さなSub-issueを別々のworktreeで実装し、関連するものを`feat/*`のPRにまとめます。前提となるfeature PRが未マージでも、そのブランチをbaseにして次のPRを積めます。異なるAIによるレビューとチェックの後、`feat/* → stack`にsquash mergeします。
-3. `stack → dev`のPRが**人間のレビュー窓口**です。各feature PRへのリンク、対象Sub-issue、スクリーンショット、検証結果、懸念点を一覧化します。**あなたの明示的な承認があるまで`dev`にマージしません**。自動マージもしません。なおGitHubではPR作成者が自分のPRを「Approve」できないため、AIがあなたのアカウントでPRを作った場合は、あなた自身のPRコメントや明示的な指示を承認として扱います（AIが承認を代行することはありません）。
-4. リリース時は別の`dev → main` PRを作り、**再度、人間の承認を得てSquash merge**します。これにより**mainには1リリースにつき1コミット**だけを追加できます。Squash merge後は新しい`main`を`dev`へ通常のmerge commitで取り込み、レビュー待ちの変更がない場合に限って`stack`も`dev`へfast-forward同期します。長期運用ブランチをreset・force-pushしてはいけません。
+1. `dev`がなければ安定版ブランチから作ります。**新しい**`stack/<topic>`は原則として、その時点の最新の`dev`から分岐させます。細かなネイティブSub-issueを個別worktreeで実装し、関連するものを`feat/*`のPRにまとめます。
+2. 各feature PRを別モデルがレビューし、問題がなければ**所属する`stack/<topic>`へSquash merge**します。依存する後続PRは必要に応じてrestackします。
+3. `stack/<topic> → dev`は**テーマ専用の人間向けレビューPR**です。対応するfeature PR、Sub-issue、画面、検証結果、懸念点を一覧化します。**あなたが各スタックを明示的に承認してから、通常のMerge commitで`dev`へ統合**します。自動マージはしません。
+4. 承認・統合済みの`feat/*`と`stack/<topic>`は、後続PRの依存や未統合の作業が残っていない場合に限って削除します。
+5. 別途`dev → main`のPRを作り、**再度人間が承認してからSquash merge**します。`main`の新しいコミットは、リリース後に`dev`へ通常マージして履歴を整合させます。レビュー途中の`stack/*`を強制的に更新・破棄しません。
 
-`stack → dev`が承認・統合された後、対象の`feat/*`ブランチは、**依存する後続stacked PRがすべてrestackまたはmerge済みで、他のopen PRのbaseにも使われていないこと**を確認してから削除します。`stack`・`dev`・`main`は削除しません。
-
-**ブランチ名の注意：** `stack`というブランチが存在すると`stack/xxx`はGit上で作れません。機能ブランチには`feat/xxx`、個別作業には`work/issue-123`を使います.
+**既存の`stack`からの移行：** Gitでは`stack`と`stack/xxx`を同時に作れません。差分・既存PR・ブランチ保護を確認し、[GitHubのBranches画面からリネーム](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-branches-in-your-repository/renaming-a-branch)して、例えば`archive/legacy-stack-20261111`に退避してから`stack/*`を作成します。安全性が確認でき、許可がある場合は旧ブランチを削除する方法もあります。**Skillを書き換えただけでは、既存ブランチの名前は変更されません。**
 
 ## GitHub Actionsの利用確認
 

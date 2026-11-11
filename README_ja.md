@@ -6,10 +6,59 @@
 
 オープンな[Agent Skills CLI](https://github.com/vercel-labs/skills)を通じて、**Cursor、Codex、Claude Code**で利用できます。
 
+## 全体ワークフロー
+
+**Epic の設計 → 細かいネイティブ Sub-issue → 複数 Issue をまとめた feat PR → 人間レビュー → リリース**を段階的に分離します。2箇所の人間による承認ゲートは必須です。
+
+```mermaid
+flowchart LR
+    SPEC["仕様・依頼"] --> EPIC["Epic Issue<br/>詳細設計 + Mermaid"]
+    EPIC --> ISSUES["ネイティブ Sub-issue<br/>小さく検証可能"]
+    ISSUES --> FEAT["Stacked feat/* PR<br/>別モデルのAIレビュー"]
+    FEAT -->|"Squash merge"| STACK["stack/topic<br/>テーマ別ステージング"]
+    STACK --> HUB["レビュー用PR<br/>stack/topic → dev"]
+    HUB --> GATE{"人間が承認？"}
+    GATE -->|"修正依頼"| FEAT
+    GATE -->|"承認：通常マージ"| DEV["dev<br/>承認済み開発版"]
+    DEV --> RELEASE["リリースPR<br/>dev → main"]
+    RELEASE --> RELEASE_GATE{"人間が承認？"}
+    RELEASE_GATE -->|"修正依頼"| DEV
+    RELEASE_GATE -->|"承認：Squash merge"| MAIN["main<br/>安定版"]
+```
+
+リリース後は `main` の新しいコミットを `dev` へ通常マージし、履歴を同期します。GitHub Actions は特に Private リポジトリで[事前確認](#github-actionsの利用確認)を必須とします。
 ## ワークフローの特徴
 
 **Sub-issueの粒度とPRの粒度は別です。** 各Sub-issueは独立して完了判定できる小さな実装成果に分けつつ、関連する複数のSub-issueを1本の機能別PRにまとめます。依存するPRは、前のPRのマージを待たずにその機能ブランチをbaseとして積みます。各PRの差分はそのPRの直接のbaseと比較してレビューし、squash merge後は後続PRを安全にrebase・retargetします。最初のfeature PRのbaseは`main`ではなく、そのテーマ専用の`stack/<topic>`です。
 
+### 例：細かい Issue と、まとまった PR
+
+**Epic は設計単位、Sub-issue は検証可能な実装単位、PR は関連する Sub-issue の統合単位**です。破線はPRの**ベースブランチ依存**を示します。各PRは依存順に、所属するレビュー用 `stack/*` へ個別に Squash merge します。
+
+```mermaid
+flowchart TD
+    EPIC["Epic: 席エディタ<br/>詳細仕様 + フローチャート"]
+    I1["Sub-issue A<br/>スキーマ定義"]
+    I2["Sub-issue B<br/>状態管理"]
+    I3["Sub-issue C<br/>エディタUI"]
+    I4["Sub-issue D<br/>入力検証"]
+    I5["Sub-issue E<br/>結合テスト"]
+    PA["PR A<br/>feat/seat-foundation"]
+    PB["PR B<br/>feat/seat-ui"]
+    PC["PR C<br/>feat/seat-tests"]
+    ST["stack/seat-editor<br/>人間レビュー用"]
+    EPIC --> I1 & I2 & I3 & I4 & I5
+    I1 --> PA
+    I2 --> PA
+    I3 --> PB
+    I4 --> PB
+    I5 --> PC
+    PA -.->|"ベースの依存"| PB
+    PB -.->|"ベースの依存"| PC
+    PA -->|"最初にSquash"| ST
+    PB -->|"次にSquash"| ST
+    PC -->|"最後にSquash"| ST
+```
 参考事例は[sekigae-app](https://github.com/ks250206/sekigae-app)です。**13 Epic・146個の実Sub-issue・11本のstacked PR** に分け、[PR #161](https://github.com/ks250206/sekigae-app/pull/161) → [PR #162](https://github.com/ks250206/sekigae-app/pull/162) → [PR #163](https://github.com/ks250206/sekigae-app/pull/163) のように積んでいます。これは**目安となる構造であり、小さな案件でも同じ数を強制するものではありません**。
 
 ## Epic Issueは詳細な設計書として作成
@@ -19,19 +68,24 @@
 **すべてのEpic IssueにMermaidの`flowchart`を最低1つ必須**とし、実際のユーザー操作、処理分岐、データの流れ、システム構成・処理ライフサイクルなどを図示します。単なる「計画→実装→テスト」図だけでは不可。依存関係が複雑なEpicでは、実際のSub-issue番号を使った依存DAGも追加します。GitHub上での表示とリンクの整合性を確認します。
 
 具体的な記述例とMermaid図を含む[親Epic Issueテンプレート](skills/github-issue-flow/references/epic-issue-template.md)を追加しました。Epic作成後にSub-issueを発行し、親Issueへリンク・依存関係を追記する運用です。
+
 ## テーマ別レビュースタックと承認フロー
 
 単一の`stack`ブランチを使う代わりに、**Epicまたは関連する開発テーマごとに`stack/<topic>`を作成**します。テーマごとに独立したPRとプレビューを用意できるので、複数の開発を並行してレビューできます。
 
-```text
-main（安定版・リリース）
-└── dev（承認済み開発内容の統合先）
-    ├── stack/room-editor    → dev（人間のレビューPR A）
-    │   └── feat/room-foundation → stack/room-editor
-    │       └── feat/seat-layout → feat/room-foundation
-    └── stack/solver         → dev（人間のレビューPR B）
-        └── feat/rule-evaluator  → stack/solver
-            └── feat/optimization → feat/rule-evaluator
+```mermaid
+flowchart LR
+    subgraph ROOM["座席エディタのレビュー"]
+        A["feat/room-foundation"] -->|"依存PR"| B["feat/seat-layout"]
+        B -->|"順にSquash"| SR["stack/room-editor"]
+    end
+    subgraph SOLVER["ソルバーのレビュー"]
+        C["feat/rule-evaluator"] -->|"依存PR"| D["feat/optimization"]
+        D -->|"順にSquash"| SS["stack/solver"]
+    end
+    SR -->|"人間承認後、通常マージ"| DEV["dev"]
+    SS -->|"人間承認後、通常マージ"| DEV
+    DEV -->|"リリース承認後、Squash"| MAIN["main"]
 ```
 
 1. `dev`がなければ安定版ブランチから作ります。**新しい**`stack/<topic>`は原則として、その時点の最新の`dev`から分岐させます。細かなネイティブSub-issueを個別worktreeで実装し、関連するものを`feat/*`のPRにまとめます。

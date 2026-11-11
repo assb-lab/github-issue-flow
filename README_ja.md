@@ -25,9 +25,11 @@ main              安定版・リリース用（人間の承認が必要）
 1. 対象リポジトリで`dev`と`stack`がなければ、安定ブランチから安全に作成します。すでにあるブランチの履歴は消しません。
 2. 小さなSub-issueを別々のworktreeで実装し、関連するものを`feat/*`のPRにまとめます。前提となるfeature PRが未マージでも、そのブランチをbaseにして次のPRを積めます。異なるAIによるレビューとチェックの後、`feat/* → stack`にsquash mergeします。
 3. `stack → dev`のPRが**人間のレビュー窓口**です。各feature PRへのリンク、対象Sub-issue、スクリーンショット、検証結果、懸念点を一覧化します。**あなたの明示的な承認があるまで`dev`にマージしません**。自動マージもしません。なおGitHubではPR作成者が自分のPRを「Approve」できないため、AIがあなたのアカウントでPRを作った場合は、あなた自身のPRコメントや明示的な指示を承認として扱います（AIが承認を代行することはありません）。
-4. リリース時は別の`dev → main` PRを作り、**再度、人間の承認**を求めます。長期運用ブランチ間は基本的に通常のmerge commitで履歴を保存し、安全なfast-forward同期を可能にします。
+4. リリース時は別の`dev → main` PRを作り、**再度、人間の承認を得てSquash merge**します。これにより**mainには1リリースにつき1コミット**だけを追加できます。Squash merge後は新しい`main`を`dev`へ通常のmerge commitで取り込み、レビュー待ちの変更がない場合に限って`stack`も`dev`へfast-forward同期します。長期運用ブランチをreset・force-pushしてはいけません。
 
-**ブランチ名の注意：** `stack`というブランチが存在すると`stack/xxx`はGit上で作れません。機能ブランチには`feat/xxx`、個別作業には`work/issue-123`を使います。
+`stack → dev`が承認・統合された後、対象の`feat/*`ブランチは、**依存する後続stacked PRがすべてrestackまたはmerge済みで、他のopen PRのbaseにも使われていないこと**を確認してから削除します。`stack`・`dev`・`main`は削除しません。
+
+**ブランチ名の注意：** `stack`というブランチが存在すると`stack/xxx`はGit上で作れません。機能ブランチには`feat/xxx`、個別作業には`work/issue-123`を使います.
 
 ## GitHub Actionsの利用確認
 

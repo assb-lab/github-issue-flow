@@ -12,6 +12,13 @@ Compatible with **Cursor, Codex, and Claude Code** through the open [Agent Skill
 
 [sekigae-app](https://github.com/ks250206/sekigae-app) is the reference pattern: **13 Epics, 146 native sub-issues and 11 stacked implementation PRs**, starting with [PR #161](https://github.com/ks250206/sekigae-app/pull/161) → [PR #162](https://github.com/ks250206/sekigae-app/pull/162) → [PR #163](https://github.com/ks250206/sekigae-app/pull/163). Those counts are an example, **not fixed quotas** for smaller projects.
 
+## Epic Issues as detailed specifications
+
+Every Epic/parent Issue must be a **substantial design specification**, not just a title and a task checklist. It contains the problem and goals, in/out scope, concrete behavior and edge cases, architecture/interface contracts, integration/dependency plan, test strategy, measurable acceptance criteria, and linked native sub-issues.
+
+**At least one feature-specific Mermaid `flowchart` is required in every Epic Issue.** It should show the real user journey, data/control flow or system lifecycle, including meaningful decision and failure paths. Complex Epics should also have a second Mermaid dependency diagram with actual child Issue numbers. Agents must validate the diagrams and update the parent Issue after creating its real sub-issues.
+
+See the [copyable Epic Issue template](skills/github-issue-flow/references/epic-issue-template.md), including a worked Mermaid example and an authoring checklist.
 ## Topic-specific review stacks and human promotion
 
 Instead of one global `stack` branch, use **one short-lived review stack per independent Epic or related work batch**. This supports multiple concurrent human reviews without a shared review queue.

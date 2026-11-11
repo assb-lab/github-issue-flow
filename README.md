@@ -2,34 +2,45 @@
 
 [日本語](README_ja.md)
 
-A stack-agnostic Agent Skill for **issue-first AI coding**: Epics → **fine-grained, real GitHub sub-issues** → parallel worktrees → **stacked feature PRs** → AI review and a human-facing **`stack` review lane** → approved **`dev` integration** → reviewed **`main` release**. GitHub Actions are opt-in.
+A stack-agnostic Agent Skill for **issue-first AI coding**: Epics → **fine-grained, real GitHub sub-issues** → parallel worktrees → **stacked feature PRs** → AI review and **topic-specific `stack/*` review lanes** → approved **`dev` integration** → reviewed **`main` release**. GitHub Actions are opt-in.
 
 Compatible with **Cursor, Codex, and Claude Code** through the open [Agent Skills CLI](https://github.com/vercel-labs/skills).
 
 ## What makes this workflow different
 
-**Issue granularity is not PR granularity.** The agent tracks each small, verifiable deliverable as a native GitHub sub-issue, but groups related sub-issues into cohesive PRs. Dependent PRs target their immediate predecessor's still-open branch, instead of waiting for every predecessor to merge. Each incremental diff is reviewed against its own PR base; squash-merged feature stacks are carefully restacked against `stack`, not `main`.
+**Issue granularity is not PR granularity.** The agent tracks each small, verifiable deliverable as a native GitHub sub-issue, but groups related sub-issues into cohesive PRs. Dependent PRs target their immediate predecessor's still-open branch, instead of waiting for every predecessor to merge. Each incremental diff is reviewed against its own PR base; squash-merged feature stacks are carefully restacked against their assigned `stack/<topic>` branch, not `main`.
 
 [sekigae-app](https://github.com/ks250206/sekigae-app) is the reference pattern: **13 Epics, 146 native sub-issues and 11 stacked implementation PRs**, starting with [PR #161](https://github.com/ks250206/sekigae-app/pull/161) → [PR #162](https://github.com/ks250206/sekigae-app/pull/162) → [PR #163](https://github.com/ks250206/sekigae-app/pull/163). Those counts are an example, **not fixed quotas** for smaller projects.
 
-## Branch lanes and human review
+## Epic Issues as detailed specifications
+
+Every Epic/parent Issue must be a **substantial design specification**, not just a title and a task checklist. It contains the problem and goals, in/out scope, concrete behavior and edge cases, architecture/interface contracts, integration/dependency plan, test strategy, measurable acceptance criteria, and linked native sub-issues.
+
+**At least one feature-specific Mermaid `flowchart` is required in every Epic Issue.** It should show the real user journey, data/control flow or system lifecycle, including meaningful decision and failure paths. Complex Epics should also have a second Mermaid dependency diagram with actual child Issue numbers. Agents must validate the diagrams and update the parent Issue after creating its real sub-issues.
+
+See the [copyable Epic Issue template](skills/github-issue-flow/references/epic-issue-template.md), including a worked Mermaid example and an authoring checklist.
+## Topic-specific review stacks and human promotion
+
+Instead of one global `stack` branch, use **one short-lived review stack per independent Epic or related work batch**. This supports multiple concurrent human reviews without a shared review queue.
 
 ```text
-main              released/stable (release approval required)
-└── dev           integrated and human-approved
-    └── stack     review staging branch; human review hub = PR stack → dev
-        └── feat/foundation  PR A, base: stack
-            └── feat/domain PR B, base: feat/foundation
+main (released)
+└── dev (human-approved integration)
+    ├── stack/room-editor    → dev (review hub PR A)
+    │   └── feat/room-foundation  → stack/room-editor
+    │       └── feat/seat-layout  → feat/room-foundation
+    └── stack/solver         → dev (review hub PR B)
+        └── feat/rule-evaluator   → stack/solver
+            └── feat/optimization → feat/rule-evaluator
 ```
 
-1. The agent creates `dev` and `stack` from the existing stable branch when missing, without resetting branches that already exist.
-2. Related sub-issues are implemented in independent worktrees and grouped into feature PRs. Dependent PRs stack on each other's feature branches. After independent AI review and checks, feature PRs are **squash-merged into `stack`**, restacking any descendants.
-3. A `stack → dev` PR acts as the **review hub**: it lists all feature PRs, related Issues, screenshots/previews, checks and outstanding concerns. **Human approval is mandatory** for promotion to `dev`; no auto-merge. If the agent opens PRs under your own GitHub account, GitHub does not allow you to approve your own PR, so an explicit human comment or direct instruction is accepted instead. The agent must not manufacture approval.
-4. Release is a separate **human-approved `dev → main` Squash merge**, creating **one `main` commit per release**. Because a squash commit changes ancestry, merge the new `main` tip **back into `dev` with a normal merge commit** after release; when no unreviewed staging changes remain, fast-forward `stack` to the synchronized `dev`. Never reset or force-push these long-lived branches.
+1. The agent creates `dev` from the stable release branch when missing. Each **new** `stack/<topic>` branch starts from the current `dev` tip. Related native sub-issues are implemented in independent worktrees and grouped into feature PRs.
+2. Each feature PR is independently cross-model reviewed, then **squash-merged into its own review stack**. Dependent feature PRs are restacked after an upstream feature PR squashes.
+3. Each `stack/<topic> → dev` **review-hub PR** includes cumulative changes, links to the feature PRs/sub-issues, screenshots/previews, tests and known gaps. **The human reviews and explicitly approves each stack**; the agent then **uses a regular merge commit**, not a squash, to promote that topic to `dev`.
+4. After promotion, delete completed `feat/*` branches and the associated `stack/<topic>` branch only if no open PR or dependent work still needs them. No auto-merge or artificial approvals.
+5. The separate `dev → main` release PR requires **another explicit human approval** and uses **Squash merge**: one commit per release on `main`. Then merge the new `main` commit back into `dev` to reconcile ancestry without losing detailed development history; do not reset or overwrite ongoing review stacks.
 
-Once a `stack → dev` batch is human-approved and integrated, delete the batch's merged `feat/*` branches **only after all dependent stacked PRs have been restacked/merged and no open PR still uses those branches as its base**. Do not delete the permanent `stack`, `dev`, or `main` branches.
-
-**Branch name warning:** the persistent branch is named `stack`, so feature branches **cannot** be named `stack/anything` (Git ref namespace collision). Use `feat/*` and `work/issue-*` instead.
+**Migrating an existing `stack` branch:** Git cannot store `stack` and `stack/something` simultaneously. Inspect the legacy branch first, then [rename it in GitHub's Branches UI](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-branches-in-your-repository/renaming-a-branch) to a nonconflicting archive name such as `archive/legacy-stack-20261111` (or safely delete it after verifying it has no unique/unmerged work and getting permission). Only then create named review stacks. A rename is a **separate repository operation**; merely updating this Skill does not rename the old branch.
 
 ## GitHub Actions cost decision
 

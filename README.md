@@ -76,12 +76,14 @@ Instead of one global `stack` branch, use **one short-lived review stack per ind
 ```mermaid
 flowchart LR
     subgraph ROOM["Seat editor review stack"]
-        A["feat/room-foundation"] -->|"Dependent PR"| B["feat/seat-layout"]
-        B -->|"Squash in order"| SR["stack/room-editor"]
+        A["feat/room-foundation"] -->|"PR base dependency"| B["feat/seat-layout"]
+        A -->|"Squash first"| SR["stack/room-editor"]
+        B -->|"Squash next"| SR
     end
     subgraph SOLVER["Solver review stack"]
-        C["feat/rule-evaluator"] -->|"Dependent PR"| D["feat/optimization"]
-        D -->|"Squash in order"| SS["stack/solver"]
+        C["feat/rule-evaluator"] -->|"PR base dependency"| D["feat/optimization"]
+        C -->|"Squash first"| SS["stack/solver"]
+        D -->|"Squash next"| SS
     end
     SR -->|"Human-approved merge commit"| DEV["dev"]
     SS -->|"Human-approved merge commit"| DEV

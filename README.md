@@ -24,7 +24,7 @@ main              released/stable (release approval required)
 
 1. The agent creates `dev` and `stack` from the existing stable branch when missing, without resetting branches that already exist.
 2. Related sub-issues are implemented in independent worktrees and grouped into feature PRs. Dependent PRs stack on each other's feature branches. After independent AI review and checks, feature PRs are **squash-merged into `stack`**, restacking any descendants.
-3. A `stack → dev` PR acts as the **review hub**: it lists all feature PRs, related Issues, screenshots/previews, checks and outstanding concerns. **Human approval is mandatory** for promotion to `dev`; no auto-merge.
+3. A `stack → dev` PR acts as the **review hub**: it lists all feature PRs, related Issues, screenshots/previews, checks and outstanding concerns. **Human approval is mandatory** for promotion to `dev`; no auto-merge. If the agent opens PRs under your own GitHub account, GitHub does not allow you to approve your own PR, so an explicit human comment or direct instruction is accepted instead. The agent must not manufacture approval.
 4. Release is a separate `dev → main` PR requiring **another human approval**. Promotions between the long-lived branches should preserve ancestry (regular merge commits), so `stack`/`dev` can be fast-forward synchronized safely.
 
 **Branch name warning:** the persistent branch is named `stack`, so feature branches **cannot** be named `stack/anything` (Git ref namespace collision). Use `feat/*` and `work/issue-*` instead.
